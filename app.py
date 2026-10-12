@@ -5,9 +5,9 @@ from supabase import create_client
 # Configuración de la página (Diseño optimizado para celulares)
 st.set_page_config(page_title="SuperAhorro", page_icon="🛒", layout="centered")
 
-# Conexión a Supabase (usando los secretos de Streamlit o valores directos)
-SUPABASE_URL = "https://mtfiiqmfhgvbhxphkysd.supabase.co"
-SUPABASE_KEY = "TU_SUPABASE_ANON_KEY"  # Reemplazá con tu key pública si no usas st.secrets
+# Conexión a Supabase usando los secretos configurados en Streamlit Cloud
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 
 @st.cache_resource
@@ -81,4 +81,3 @@ if st.button("🔍 Calcular Supermercado Más Barato", use_container_width=True)
     st.warning("Por favor elegí al menos un producto para calcular.")
   else:
     st.info("Calculando los mejores precios y descuentos vigentes...")
-    # Lógica de cálculo o despliegue de resultados
