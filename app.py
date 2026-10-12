@@ -52,16 +52,22 @@ with st.expander("➕ ¿No encontrás un producto? Agregalo acá"):
   if st.button("Guardar producto en la base"):
     if nuevo_nombre:
       try:
+        # Generamos un código temporal único basado en milisegundos para cumplir con la columna EAN
+        import time
+
+        ean_temporal = f"TEMP-{int(time.time())}"
+
         supabase.table("productos").insert({
             "nombre": nuevo_nombre,
             "categoria": nueva_categoria,
+            "ean": ean_temporal,
         }).execute()
         st.success(f"¡'{nuevo_nombre}' agregado con éxito! Recargá la página.")
         st.rerun()
       except Exception as e:
         st.error(f"Error al guardar: {e}")
     else:
-        st.warning("Escribí un nombre para el producto.")
+      st.warning("Escribí un nombre para el producto.")
 
 # --- 2. SECCIÓN BENEFICIOS ---
 st.markdown("### 💳 Tus Beneficios")
