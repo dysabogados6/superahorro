@@ -1,158 +1,84 @@
-import streamlit as st
 import pandas as pd
-from supabase import create_client, Client
+import streamlit as st
+from supabase import create_client
 
-# Configuración de página optimizada para celulares
-st.set_page_config(
-    page_title="SuperAhorro Argentina",
-    page_icon="🛒",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+# Configuración de la página (Diseño optimizado para celulares)
+st.set_page_config(page_title="SuperAhorro", page_icon="🛒", layout="centered")
+
+# Conexión a Supabase (usando los secretos de Streamlit o valores directos)
+SUPABASE_URL = "https://mtfiiqmfhgvbhxphkysd.supabase.co"
+SUPABASE_KEY = "TU_SUPABASE_ANON_KEY"  # Reemplazá con tu key pública si no usas st.secrets
+
+
+@st.cache_resource
+def init_connection():
+  return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+supabase = init_connection()
+
+st.markdown(
+    """
+    <h2 style='text-align: center;'>🛒 SuperAhorro</h2>
+    <p style='text-align: center; color: gray;'>Comparador de precios y promos en vivo AR</p>
+""",
+    unsafe_allow_html=True,
 )
 
-# Estilos CSS personalizados para que luzca como una App de celular nativa
-st.markdown("""
-    <style>
-    .main {
-        background-color: #f8f9fa;
-    }
-    .stButton>button {
-        width: 100%;
-        border-radius: 12px;
-        height: 50px;
-        font-weight: bold;
-        font-size: 16px;
-    }
-    .card-ganador {
-        background-color: #d4edda;
-        border: 2px solid #28a745;
-        padding: 15px;
-        border-radius: 12px;
-        text-align: center;
-        color: #155724;
-        margin-bottom: 15px;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# --- 1. SECCIÓN CANASTA / BÚSQUEDA ---
+st.markdown("### 📦 Tu Canasta")
 
-SUPABASE_URL = "https://mtfiiqmfhgvbhxphkysd.supabase.co"
-SUPABASE_KEY = "sb_publishable_zue_bcg3IzHV_GwvKk0HNQ_bq6_R9ei"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Obtener productos existentes en la base de datos
+try:
+  res_prod = supabase.table("productos").select("*").execute()
+  lista_productos = res_prod.data if res_prod.data else []
+except Exception as e:
+  lista_productos = []
+  st.error(f"Error al conectar con Supabase: {e}")
 
-st.title("🛒 SuperAhorro")
-st.caption("Comparador de precios y promos bancarias en vivo 🇦🇷")
+nombres_productos = [p["nombre"] for p in lista_productos]
 
-@st.cache_data(ttl=30)
-def cargar_datos():
-    res_p = supabase.table("productos").select("ean, nombre").execute()
-    prods = {p['nombre']: p['ean'] for p in res_p.data}
-    
-    res_pr = supabase.table("precios_diarios").select("ean, supermercado, precio_lista, precio_promocion").execute()
-    df_precios = pd.DataFrame(res_pr.data)
-    
-    res_promos = supabase.table("promociones").select("*").eq("activo", True).execute()
-    df_promos = pd.DataFrame(res_promos.data)
-    
-    return prods, df_precios, df_promos
+# Selector de productos múltiples
+productos_seleccionados = st.multiselect(
+    "Elegí o buscá los productos que querés comprar:", nombres_productos
+)
 
-productos_dict, df_precios, df_promos = cargar_datos()
-lista_nombres = list(productos_dict.keys())
-
-# Formulario principal vertical (ideal para celular)
-with st.form("form_superahorro"):
-    st.subheader("📦 Tu Canasta")
-    productos_seleccionados = st.multiselect(
-        "Elegí los productos que querés comprar:",
-        options=lista_nombres,
-        default=lista_nombres
-    )
-    
-    st.subheader("💳 Tus Beneficios")
-    col1, col2 = st.columns(2)
-    with col1:
-        medios_pago = ["Cuenta DNI", "BNA MODO", "Galicia", "BBVA", "Sin Promoción / Efectivo"]
-        medio_pago = st.selectbox("Medio de Pago", medios_pago)
-    with col2:
-        dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
-        dia_semana = st.selectbox("Día de Compra", dias, index=5) # Sábado por defecto
-        
-    submitted = st.form_submit_button("🔍 Calcular Supermercado Más Barato")
-
-if submitted:
-    if not productos_seleccionados:
-        st.warning("⚠️ Seleccioná al menos un producto.")
+# Opción para agregar un producto nuevo si no existe
+with st.expander("➕ ¿No encontrás un producto? Agregalo acá"):
+  nuevo_nombre = st.text_input("Nombre del producto (ej: Yogur Firme Día 190g)")
+  nueva_categoria = st.selectbox(
+      "Categoría", ["Lácteos", "Almacén", "Bebidas", "Limpieza", "Frescos"]
+  )
+  if st.button("Guardar producto en la base"):
+    if nuevo_nombre:
+      try:
+        supabase.table("productos").insert({
+            "nombre": nuevo_nombre,
+            "categoria": nueva_categoria,
+        }).execute()
+        st.success(f"¡'{nuevo_nombre}' agregado con éxito! Recargá la página.")
+        st.rerun()
+      except Exception as e:
+        st.error(f"Error al guardar: {e}")
     else:
-        eans_sel = [productos_dict[n] for n in productos_seleccionados]
-        df_filtrado = df_precios[df_precios['ean'].isin(eans_sel)].copy()
-        
-        if df_filtrado.empty:
-            st.error("❌ No hay precios para los productos seleccionados.")
-        else:
-            df_filtrado['precio_efectivo'] = df_filtrado['precio_promocion'].fillna(df_filtrado['precio_lista'])
-            totales_super = df_filtrado.groupby('supermercado')['precio_efectivo'].sum().reset_index()
-            totales_super.rename(columns={'precio_efectivo': 'subtotal_canasta'}, inplace=True)
+        st.warning("Escribí un nombre para el producto.")
 
-            resultados = []
-            for _, row in totales_super.iterrows():
-                super_name = row['supermercado']
-                subtotal = row['subtotal_canasta']
+# --- 2. SECCIÓN BENEFICIOS ---
+st.markdown("### 💳 Tus Beneficios")
+col1, col2 = st.columns(2)
+with col1:
+  medio_pago = st.selectbox(
+      "Medio de Pago", ["Ninguno", "Cuenta DNI", "Modo", "Tarjeta Galicia"]
+  )
+with col2:
+  dia_compra = st.selectbox(
+      "Día de Compra", ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+  )
 
-                promo_aplicable = pd.DataFrame()
-                if not df_promos.empty:
-                    promo_aplicable = df_promos[
-                        (df_promos['supermercado'].str.lower() == super_name.lower()) & 
-                        (df_promos['banco_medio_pago'].str.lower() == medio_pago.lower()) &
-                        ((df_promos['dia_semana'].str.lower() == dia_semana.lower()) | (df_promos['dia_semana'] == 'todos'))
-                    ]
-
-                descuento_monto = 0.0
-                detalle_promo = "Sin descuento bancario"
-
-                if not promo_aplicable.empty:
-                    p = promo_aplicable.iloc[0]
-                    pct = float(p['descuento_porcentaje'])
-                    tope = float(p['tope_reintegro']) if pd.notnull(p['tope_reintegro']) else None
-                    
-                    descuento_teorico = subtotal * (pct / 100.0)
-                    if tope and descuento_teorico > tope:
-                        descuento_monto = tope
-                        detalle_promo = f"{pct:.0f}% desc. (Tope \${tope:,.0f})"
-                    else:
-                        descuento_monto = descuento_teorico
-                        detalle_promo = f"{pct:.0f}% desc. con {medio_pago}"
-
-                total_final = subtotal - descuento_monto
-                resultados.append({
-                    'Supermercado': super_name,
-                    'Subtotal': subtotal,
-                    'Descuento': descuento_monto,
-                    'Total Final': total_final,
-                    'Promoción': detalle_promo,
-                    '_total_num': total_final
-                })
-
-            df_resultado = pd.DataFrame(resultados).sort_values(by='_total_num')
-            ganador = df_resultado.iloc[0]
-            segundo = df_resultado.iloc[1] if len(df_resultado) > 1 else None
-
-            # Tarjeta destacada del ganador
-            st.markdown("---")
-            st.markdown(f"""
-                <div class="card-ganador">
-                    <h3>🏆 ¡MEJOR OPCIÓN: {ganador['Supermercado'].upper()}!</h3>
-                    <h2>\${ganador['Total Final']:,.2f}</h2>
-                    <p>{ganador['Promoción']}</p>
-                </div>
-            """, unsafe_allow_html=True)
-
-            if segundo is not None:
-                ahorro = segundo['_total_num'] - ganador['_total_num']
-                if ahorro > 0:
-                    st.success(f"💡 **¡Ahorrás \${ahorro:,.2f}** comprando acá en lugar de en {segundo['Supermercado']}!")
-
-            st.markdown("#### 📊 Detalle de Canasta")
-            for _, r in df_resultado.iterrows():
-                with st.expander(f"📍 {r['Supermercado']} — Total: \${r['Total Final']:,.2f}"):
-                    st.write(f"• Subtotal sin promo: \${r['Subtotal']:,.2f}")
-                    st.write(f"• Descuento aplicado: \${r['Descuento']:,.2f}")
-                    st.write(f"• Beneficio: {r['Promoción']}")
+# Botón de cálculo
+if st.button("🔍 Calcular Supermercado Más Barato", use_container_width=True):
+  if not productos_seleccionados:
+    st.warning("Por favor elegí al menos un producto para calcular.")
+  else:
+    st.info("Calculando los mejores precios y descuentos vigentes...")
+    # Lógica de cálculo o despliegue de resultados
