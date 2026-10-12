@@ -52,15 +52,15 @@ with st.expander("➕ ¿No encontrás un producto? Agregalo acá"):
   if st.button("Guardar producto en la base"):
     if nuevo_nombre:
       try:
-        # Generamos un código temporal único basado en milisegundos para cumplir con la columna EAN
-        import time
+        # Generamos un EAN numérico corto de exactamente 12 caracteres para respetar el límite de Supabase
+        import random
 
-        ean_temporal = f"TEMP-{int(time.time())}"
+        ean_corto = str(random.randint(100000000000, 999999999999))
 
         supabase.table("productos").insert({
             "nombre": nuevo_nombre,
             "categoria": nueva_categoria,
-            "ean": ean_temporal,
+            "ean": ean_corto,
         }).execute()
         st.success(f"¡'{nuevo_nombre}' agregado con éxito! Recargá la página.")
         st.rerun()
