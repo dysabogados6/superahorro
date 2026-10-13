@@ -1,4 +1,5 @@
 import pandas as pd
+import random
 import streamlit as st
 from supabase import create_client
 
@@ -45,20 +46,21 @@ productos_seleccionados = st.multiselect(
 
 # Opción para agregar un producto nuevo si no existe
 with st.expander("➕ ¿No encontrás un producto? Agregalo acá"):
-  nuevo_nombre = st.text_input("Nombre del producto (ej: Yogur Firme Día 190g)")
+  nuevo_nombre = st.text_input("Nombre del producto (ej: Yogur Griego Natural)")
+  nueva_marca = st.text_input("Marca (ej: Yagurísimo / Día)")
   nueva_categoria = st.selectbox(
       "Categoría", ["Lácteos", "Almacén", "Bebidas", "Limpieza", "Frescos"]
   )
-  if st.button("Guardar producto en la base"):
-    if nuevo_nombre:
-      try:
-        # Generamos un EAN numérico corto de exactamente 12 caracteres para respetar el límite de Supabase
-        import random
 
+  if st.button("Guardar producto en la base"):
+    if nuevo_nombre and nueva_marca:
+      try:
+        # Generamos un EAN numérico corto de 12 dígitos para cumplir con la restricción
         ean_corto = str(random.randint(100000000000, 999999999999))
 
         supabase.table("productos").insert({
             "nombre": nuevo_nombre,
+            "marca": nueva_marca,
             "categoria": nueva_categoria,
             "ean": ean_corto,
         }).execute()
@@ -67,7 +69,7 @@ with st.expander("➕ ¿No encontrás un producto? Agregalo acá"):
       except Exception as e:
         st.error(f"Error al guardar: {e}")
     else:
-      st.warning("Escribí un nombre para el producto.")
+      st.warning("Completá el nombre y la marca del producto.")
 
 # --- 2. SECCIÓN BENEFICIOS ---
 st.markdown("### 💳 Tus Beneficios")
