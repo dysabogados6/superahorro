@@ -48,12 +48,13 @@ productos_seleccionados = st.multiselect(
 with st.expander("➕ ¿No encontrás un producto? Agregalo acá"):
   nuevo_nombre = st.text_input("Nombre del producto (ej: Yogur Griego Natural)")
   nueva_marca = st.text_input("Marca (ej: Yagurísimo / Día)")
+  nueva_presentacion = st.text_input("Presentación (ej: 300g / 1L / 500cc)")
   nueva_categoria = st.selectbox(
       "Categoría", ["Lácteos", "Almacén", "Bebidas", "Limpieza", "Frescos"]
   )
 
   if st.button("Guardar producto en la base"):
-    if nuevo_nombre and nueva_marca:
+    if nuevo_nombre and nueva_marca and nueva_presentacion:
       try:
         # Generamos un EAN numérico corto de 12 dígitos para cumplir con la restricción
         ean_corto = str(random.randint(100000000000, 999999999999))
@@ -61,6 +62,7 @@ with st.expander("➕ ¿No encontrás un producto? Agregalo acá"):
         supabase.table("productos").insert({
             "nombre": nuevo_nombre,
             "marca": nueva_marca,
+            "presentacion": nueva_presentacion,
             "categoria": nueva_categoria,
             "ean": ean_corto,
         }).execute()
@@ -69,7 +71,7 @@ with st.expander("➕ ¿No encontrás un producto? Agregalo acá"):
       except Exception as e:
         st.error(f"Error al guardar: {e}")
     else:
-      st.warning("Completá el nombre y la marca del producto.")
+      st.warning("Completá el nombre, la marca y la presentación del producto.")
 
 # --- 2. SECCIÓN BENEFICIOS ---
 st.markdown("### 💳 Tus Beneficios")
@@ -88,4 +90,4 @@ if st.button("🔍 Calcular Supermercado Más Barato", use_container_width=True)
   if not productos_seleccionados:
     st.warning("Por favor elegí al menos un producto para calcular.")
   else:
-    st.info("Calculando los mejores precios y descuentos vigentes...")
+    st.info("Calculando los mejores precios y descuentos vigentes...")   
