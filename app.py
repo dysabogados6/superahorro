@@ -10,8 +10,8 @@ st.set_page_config(
 )
 
 # Credenciales de Supabase
-SUPABASE_URL = "https://mtfiiqmfhgvbhxphkysd.supabase.co"
-SUPABASE_KEY = "sb_secret_RhIquQs-_TyuWNzf_C0g0Q_8kSBsfWR"
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 @st.cache_resource
 def init_connection():
