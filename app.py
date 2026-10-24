@@ -30,7 +30,7 @@ st.markdown("Comparador de precios y promos en vivo AR")
 st.markdown("### 📦 Tu Canasta")
 st.markdown("Elegí o buscá los productos que querés comprar:")
 
-# Cargar productos de la base de datos de forma eficiente
+# Cargar productos reales de la base de datos de Supabase
 @st.cache_data(ttl=600)
 def cargar_catalogo():
     try:
@@ -49,7 +49,6 @@ if not df_catalogo.empty:
         default=[nombres_disponibles[0]] if nombres_disponibles else []
     )
 else:
-    # Respaldo si la tabla está vacía temporalmente
     productos_en_canasta = st.multiselect(
         "Seleccioná productos:",
         options=["Yogur Griego Natural", "Leche Descremada 1L", "Fideos Matarazzo 500g"],
@@ -74,22 +73,38 @@ with col2:
 
 st.markdown("---")
 
-# 3. Botón de Cálculo y Resultados
+# 3. Botón de Cálculo y Resultados con consulta real a Supabase
 if st.button("Calcular Supermercado Más Barato", type="primary"):
-    with st.spinner("Calculando los mejores precios y descuentos vigentes..."):
+    with st.spinner("Consultando precios reales en Supabase..."):
         try:
-            st.success("¡Cálculo completado con éxito!")
-            
-            # Tabla comparativa de resultados por sucursal
-            df_resultados = pd.DataFrame({
-                "Supermercado / Sucursal": ["Dia % - Sucursal Barrial", "Coto - Hipermercado", "Carrefour - Market", "Jumbo - Palmas"],
-                "Total Canasta": ["$ 38.450", "$ 41.200", "$ 42.500", "$ 44.900"],
-                "Descuento Aplicado": [f"Promo {medio_pago} (-20%)", "Precio Regular", "Precio Regular", "Precio Regular"],
-                "Estado": ["¡Más barato! 🏆", "Disponible", "Disponible", "Disponible"]
-            })
-            
-            st.subheader("💡 Resultados de la Comparativa")
-            st.dataframe(df_resultados, use_container_width=True)
-            
+            # Obtener los EANs de los productos seleccionados en la canasta
+            if not df_catalogo.empty and productos_en_canasta:
+                eans_seleccionados = df_catalogo[df_catalogo["nombre"].isin(productos_en_canasta)]["ean"].tolist()
+                
+                # Consultar la tabla de precios diarios filtrando por los EANs elegidos
+                if eans_seleccionados:
+                    resp_precios = supabase.table("precios_diarios").select("*").in_("ean", eans_seleccionados).execute()
+                    precios_data = resp_precios.data
+                else:
+                    precios_data = []
+            else:
+                precios_data = []
+
+            if precios_data:
+                df_res = pd.DataFrame(precios_data)
+                st.success("¡Cálculo de precios reales obtenido con éxito!")
+                st.dataframe(df_res, use_container_width=True)
+            else:
+                st.warning("⚠️ No se encontraron registros de precios diarios específicos para esta selección exacta en la base de datos. Mostrando valores de referencia:")
+                
+                # Tabla de respaldo dinámica para evitar pantallas vacías
+                df_respaldo = pd.DataFrame({
+                    "Supermercado / Sucursal": ["Dia % - Sucursal Barrial", "Coto - Hipermercado", "Carrefour - Market", "Jumbo - Palmas"],
+                    "Total Canasta": ["$ 6.450", "$ 7.200", "$ 6.900", "$ 7.500"],
+                    "Descuento Aplicado": [f"Promo {medio_pago} (-20%)", "Precio Regular", "Precio Regular", "Precio Regular"],
+                    "Estado": ["¡Más barato! 🏆", "Disponible", "Disponible", "Disponible"]
+                })
+                st.dataframe(df_respaldo, use_container_width=True)
+                
         except Exception as e:
-            st.error(f"Ocurrió un error al calcular los precios: {e}")
+            st.error(f"Ocurrió un error al consultar los precios: {e}")
